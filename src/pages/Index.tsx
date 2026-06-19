@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import Icon from '@/components/ui/icon';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -6,6 +6,14 @@ import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { toast } from 'sonner';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,7 +34,29 @@ const NAV = [
   { id: 'settings', label: 'Настройки', icon: 'Settings' },
 ];
 
-const GALLERY = [
+const INIT_ROLES = ['Художник', 'Модератор', 'Пользователь'];
+
+interface GalleryItem {
+  id: number;
+  img: string;
+  title: string;
+  author: string;
+  likes: number;
+  tag: string;
+  preview?: string;
+}
+
+interface UserProfile {
+  name: string;
+  initials: string;
+  role: string;
+  works: number;
+  likes: number;
+  bio: string;
+  img?: string;
+}
+
+const INIT_GALLERY: GalleryItem[] = [
   { id: 1, img: ART_1, title: 'Neon District', author: 'Кай', likes: 248, tag: 'Cyberpunk' },
   { id: 2, img: ART_2, title: 'Cosmic Soul', author: 'Лина', likes: 512, tag: 'Portrait' },
   { id: 3, img: ART_3, title: 'Liquid Dream', author: 'Артём', likes: 389, tag: 'Abstract' },
@@ -35,16 +65,25 @@ const GALLERY = [
   { id: 6, img: ART_2, title: 'Star Eyes', author: 'Майя', likes: 333, tag: 'Portrait' },
 ];
 
-const MOD_QUEUE = [
+const MOD_QUEUE_INIT = [
   { id: 1, img: ART_2, title: 'Galaxy Muse', author: 'newbie_99', reason: 'Авто-проверка' },
   { id: 2, img: ART_1, title: 'Dark Alley', author: 'pixel_man', reason: 'Жалоба ×2' },
   { id: 3, img: ART_3, title: 'Flow #12', author: 'art_lover', reason: 'Авто-проверка' },
 ];
 
-const MODERATORS = [
+const INIT_MODS = [
   { name: 'Лина', role: 'Главный модератор', initials: 'ЛН' },
   { name: 'Кай', role: 'Модератор', initials: 'КА' },
   { name: 'Vega', role: 'Модератор', initials: 'VG' },
+];
+
+const USERS_DB: UserProfile[] = [
+  { name: 'Кай', initials: 'КА', role: 'Художник', works: 34, likes: 2100, bio: 'Цифровое искусство и киберпанк', img: ART_1 },
+  { name: 'Лина', initials: 'ЛН', role: 'Модератор', works: 12, likes: 870, bio: 'Иллюстратор, главред галереи', img: ART_2 },
+  { name: 'Артём', initials: 'АР', role: 'Художник', works: 21, likes: 1340, bio: 'Абстрактная живопись', img: ART_3 },
+  { name: 'Vega', initials: 'VG', role: 'Модератор', works: 8, likes: 560, bio: 'Фотограф и видеограф', img: ART_1 },
+  { name: 'Соня', initials: 'СН', role: 'Художник', works: 17, likes: 980, bio: 'Акварель + digital', img: ART_3 },
+  { name: 'Майя', initials: 'МА', role: 'Пользователь', works: 5, likes: 230, bio: 'Начинающий художник', img: ART_2 },
 ];
 
 const RULES = [
@@ -58,10 +97,12 @@ function Index() {
   const [tab, setTab] = useState('gallery');
   const [quotaCount, setQuotaCount] = useState([10]);
   const [quotaSize, setQuotaSize] = useState([25]);
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [gallery, setGallery] = useState(INIT_GALLERY);
+  const [viewUser, setViewUser] = useState<UserProfile | null>(null);
 
   return (
     <div className="min-h-screen text-foreground">
-      {/* Header */}
       <header className="sticky top-0 z-50 glass">
         <div className="container flex items-center justify-between py-4">
           <div className="flex items-center gap-2">
@@ -86,11 +127,10 @@ function Index() {
               </button>
             ))}
           </nav>
-          <Button className="rounded-xl font-semibold neon-glow">
+          <Button className="rounded-xl font-semibold neon-glow" onClick={() => setUploadOpen(true)}>
             <Icon name="Upload" size={16} className="mr-1" /> Загрузить
           </Button>
         </div>
-        {/* mobile nav */}
         <nav className="flex gap-1 overflow-x-auto px-4 pb-3 md:hidden">
           {NAV.map((n) => (
             <button
@@ -107,10 +147,19 @@ function Index() {
       </header>
 
       <main className="container py-10">
-        {tab === 'gallery' && <GallerySection />}
+        {tab === 'gallery' && (
+          <GallerySection
+            gallery={gallery}
+            onUpload={() => setUploadOpen(true)}
+            onUserClick={(name) => {
+              const u = USERS_DB.find((u) => u.name === name);
+              if (u) setViewUser(u);
+            }}
+          />
+        )}
         {tab === 'moderation' && <ModerationSection />}
         {tab === 'rules' && <RulesSection />}
-        {tab === 'profile' && <ProfileSection />}
+        {tab === 'profile' && <ProfileSection onUserClick={(u) => setViewUser(u)} />}
         {tab === 'settings' && (
           <SettingsSection
             quotaCount={quotaCount}
@@ -124,11 +173,147 @@ function Index() {
       <footer className="border-t border-border/50 py-8 text-center text-sm text-muted-foreground">
         NEONART — арт-площадка сообщества · 2026
       </footer>
+
+      <UploadModal
+        open={uploadOpen}
+        onClose={() => setUploadOpen(false)}
+        onSubmit={(item) => {
+          setGallery((g) => [{ ...item, id: Date.now(), likes: 0 }, ...g]);
+          setUploadOpen(false);
+          toast.success('Работа отправлена на проверку модератору!');
+        }}
+      />
+
+      <UserProfileModal user={viewUser} onClose={() => setViewUser(null)} />
     </div>
   );
 }
 
-function GallerySection() {
+function UploadModal({ open, onClose, onSubmit }: {
+  open: boolean;
+  onClose: () => void;
+  onSubmit: (item: Omit<GalleryItem, 'id' | 'likes'>) => void;
+}) {
+  const [title, setTitle] = useState('');
+  const [tag, setTag] = useState('Abstract');
+  const [preview, setPreview] = useState('');
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const url = URL.createObjectURL(f);
+    setPreview(url);
+  };
+
+  const handleSubmit = () => {
+    if (!title.trim()) { toast.error('Введите название работы'); return; }
+    if (!preview) { toast.error('Выберите изображение'); return; }
+    onSubmit({ img: preview, title: title.trim(), author: 'Кай', tag, preview });
+    setTitle(''); setTag('Abstract'); setPreview('');
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="glass border-border/50 sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="font-display text-2xl font-extrabold">
+            Загрузить <span className="text-gradient">работу</span>
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-5 pt-2">
+          <div
+            className="group relative flex h-44 cursor-pointer flex-col items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-border/60 transition-colors hover:border-primary/60"
+            onClick={() => fileRef.current?.click()}
+          >
+            {preview ? (
+              <img src={preview} alt="preview" className="h-full w-full object-cover" />
+            ) : (
+              <>
+                <Icon name="ImagePlus" size={36} className="mb-2 text-muted-foreground group-hover:text-primary transition-colors" />
+                <p className="text-sm text-muted-foreground">Нажмите, чтобы выбрать файл</p>
+                <p className="text-xs text-muted-foreground/60">PNG, JPG, WEBP</p>
+              </>
+            )}
+            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Название работы</Label>
+            <Input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Например: Neon Dream"
+              className="rounded-xl bg-secondary/50 border-border/50"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Тег / категория</Label>
+            <div className="flex gap-2 flex-wrap">
+              {['Abstract', 'Portrait', 'Cyberpunk', 'Nature', 'Fantasy'].map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setTag(t)}
+                  className={`rounded-full px-3 py-1 text-xs font-medium transition-all ${
+                    tag === t ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-1">
+            <Button variant="secondary" className="flex-1 rounded-xl" onClick={onClose}>Отмена</Button>
+            <Button className="flex-1 rounded-xl neon-glow" onClick={handleSubmit}>
+              <Icon name="Send" size={16} className="mr-1" /> Отправить на проверку
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function UserProfileModal({ user, onClose }: { user: UserProfile | null; onClose: () => void }) {
+  if (!user) return null;
+  return (
+    <Dialog open={!!user} onOpenChange={onClose}>
+      <DialogContent className="glass border-border/50 sm:max-w-sm p-0 overflow-hidden">
+        <div className="h-28 bg-gradient-to-r from-primary/40 via-accent/30 to-primary/40" />
+        <div className="px-6 pb-6">
+          <Avatar className="-mt-12 h-20 w-20 border-4 border-background neon-glow">
+            <AvatarFallback className="bg-primary text-xl font-bold text-primary-foreground">{user.initials}</AvatarFallback>
+          </Avatar>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <h3 className="font-display text-2xl font-extrabold">{user.name}</h3>
+            <Badge className="rounded-full bg-accent/20 text-accent text-xs">{user.role}</Badge>
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">{user.bio}</p>
+          <div className="mt-5 grid grid-cols-2 gap-3">
+            <div className="rounded-xl bg-secondary/50 p-3 text-center">
+              <p className="font-display text-xl font-extrabold text-gradient">{user.works}</p>
+              <p className="text-xs text-muted-foreground">Работ</p>
+            </div>
+            <div className="rounded-xl bg-secondary/50 p-3 text-center">
+              <p className="font-display text-xl font-extrabold text-gradient">{user.likes >= 1000 ? (user.likes/1000).toFixed(1)+'K' : user.likes}</p>
+              <p className="text-xs text-muted-foreground">Лайков</p>
+            </div>
+          </div>
+          <Button variant="secondary" className="mt-4 w-full rounded-xl" onClick={onClose}>Закрыть</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function GallerySection({ gallery, onUpload, onUserClick }: {
+  gallery: GalleryItem[];
+  onUpload: () => void;
+  onUserClick: (name: string) => void;
+}) {
   return (
     <section>
       <div className="mb-8 max-w-2xl animate-float-up">
@@ -137,12 +322,15 @@ function GallerySection() {
           Покажи свой <span className="text-gradient">арт</span> миру
         </h1>
         <p className="mt-4 text-muted-foreground">
-          Выкладывай работы, собирай лайки и вдохновляй других. Площадка моей команды для творчества.
+          Выкладывай работы, собирай лайки и вдохновляй других.
         </p>
+        <Button className="mt-5 rounded-xl neon-glow" onClick={onUpload}>
+          <Icon name="Upload" size={16} className="mr-1" /> Загрузить работу
+        </Button>
       </div>
 
       <div className="columns-1 gap-5 sm:columns-2 lg:columns-3 [&>*]:mb-5">
-        {GALLERY.map((art, i) => (
+        {gallery.map((art, i) => (
           <article
             key={art.id}
             className="group relative overflow-hidden rounded-2xl glass animate-float-up"
@@ -154,7 +342,12 @@ function GallerySection() {
               <Badge className="mb-2 rounded-full bg-primary/30 text-xs text-foreground">{art.tag}</Badge>
               <h3 className="font-display text-lg font-bold">{art.title}</h3>
               <div className="mt-1 flex items-center justify-between text-sm text-muted-foreground">
-                <span>@{art.author}</span>
+                <button
+                  className="hover:text-accent transition-colors"
+                  onClick={() => onUserClick(art.author)}
+                >
+                  @{art.author}
+                </button>
                 <span className="flex items-center gap-1">
                   <Icon name="Heart" size={14} className="text-destructive" /> {art.likes}
                 </span>
@@ -168,22 +361,34 @@ function GallerySection() {
 }
 
 function ModerationSection() {
-  const [queue, setQueue] = useState(MOD_QUEUE);
-  const [mods, setMods] = useState(MODERATORS);
+  const [queue, setQueue] = useState(MOD_QUEUE_INIT);
+  const [mods, setMods] = useState(INIT_MODS);
+  const [addModOpen, setAddModOpen] = useState(false);
+  const [newModName, setNewModName] = useState('');
+  const [newModRole, setNewModRole] = useState('Модератор');
 
-  const approve = (item: (typeof MOD_QUEUE)[number]) => {
+  const approve = (item: (typeof MOD_QUEUE_INIT)[number]) => {
     setQueue((q) => q.filter((x) => x.id !== item.id));
     toast.success(`«${item.title}» одобрена и опубликована`);
   };
-
-  const reject = (item: (typeof MOD_QUEUE)[number]) => {
+  const reject = (item: (typeof MOD_QUEUE_INIT)[number]) => {
     setQueue((q) => q.filter((x) => x.id !== item.id));
     toast.error(`«${item.title}» удалена из очереди`);
   };
-
   const removeMod = (name: string) => {
     setMods((m) => m.filter((x) => x.name !== name));
     toast(`${name} снят с модерации`);
+  };
+  const promoteToChief = (name: string) => {
+    setMods((m) => m.map((x) => x.name === name ? { ...x, role: 'Главный модератор' } : x));
+    toast.success(`${name} назначен главным модератором`);
+  };
+  const handleAddMod = () => {
+    if (!newModName.trim()) { toast.error('Введите имя'); return; }
+    const initials = newModName.trim().slice(0, 2).toUpperCase();
+    setMods((m) => [...m, { name: newModName.trim(), role: newModRole, initials }]);
+    toast.success(`${newModName} добавлен как «${newModRole}»`);
+    setNewModName(''); setNewModRole('Модератор'); setAddModOpen(false);
   };
 
   return (
@@ -252,7 +457,7 @@ function ModerationSection() {
                     <DropdownMenuItem onClick={() => toast(`Профиль ${m.name}`)}>
                       <Icon name="User" size={16} className="mr-2" /> Профиль
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => toast.success(`${m.name} назначен главным`)}>
+                    <DropdownMenuItem onClick={() => promoteToChief(m.name)}>
                       <Icon name="Crown" size={16} className="mr-2" /> Сделать главным
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
@@ -263,16 +468,53 @@ function ModerationSection() {
                 </DropdownMenu>
               </div>
             ))}
-            <Button
-              variant="outline"
-              className="mt-2 w-full rounded-xl border-dashed"
-              onClick={() => toast('Форма назначения модератора скоро будет доступна')}
-            >
+            <Button variant="outline" className="mt-2 w-full rounded-xl border-dashed" onClick={() => setAddModOpen(true)}>
               <Icon name="UserPlus" size={16} className="mr-1" /> Назначить модератора
             </Button>
           </div>
         </div>
       </div>
+
+      <Dialog open={addModOpen} onOpenChange={setAddModOpen}>
+        <DialogContent className="glass border-border/50 sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl font-extrabold">Назначить модератора</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-1.5">
+              <Label>Имя пользователя</Label>
+              <Input
+                value={newModName}
+                onChange={(e) => setNewModName(e.target.value)}
+                placeholder="Например: Алекс"
+                className="rounded-xl bg-secondary/50 border-border/50"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Роль</Label>
+              <div className="flex flex-wrap gap-2">
+                {['Модератор', 'Главный модератор'].map((r) => (
+                  <button
+                    key={r}
+                    onClick={() => setNewModRole(r)}
+                    className={`rounded-full px-3 py-1 text-xs font-medium transition-all ${
+                      newModRole === r ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground'
+                    }`}
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex gap-3 pt-1">
+              <Button variant="secondary" className="flex-1 rounded-xl" onClick={() => setAddModOpen(false)}>Отмена</Button>
+              <Button className="flex-1 rounded-xl neon-glow" onClick={handleAddMod}>
+                <Icon name="UserPlus" size={16} className="mr-1" /> Назначить
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }
@@ -286,11 +528,7 @@ function RulesSection() {
       </div>
       <div className="grid gap-5 sm:grid-cols-2">
         {RULES.map((r, i) => (
-          <div
-            key={r.title}
-            className="rounded-2xl glass p-6 animate-float-up"
-            style={{ animationDelay: `${i * 80}ms` }}
-          >
+          <div key={r.title} className="rounded-2xl glass p-6 animate-float-up" style={{ animationDelay: `${i * 80}ms` }}>
             <div className="mb-3 grid h-11 w-11 place-items-center rounded-xl bg-primary/20">
               <Icon name={r.icon} size={22} className="text-primary" />
             </div>
@@ -303,45 +541,160 @@ function RulesSection() {
   );
 }
 
-function ProfileSection() {
+function ProfileSection({ onUserClick }: { onUserClick: (u: UserProfile) => void }) {
+  const [users, setUsers] = useState(USERS_DB);
+  const [roles, setRoles] = useState(INIT_ROLES);
+  const [newRole, setNewRole] = useState('');
+  const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
+  const [changeRoleOpen, setChangeRoleOpen] = useState(false);
+  const [addRoleOpen, setAddRoleOpen] = useState(false);
+
+  const me = users[0];
+
+  const openChangeRole = (u: UserProfile) => {
+    setSelectedUser(u);
+    setChangeRoleOpen(true);
+  };
+  const applyRole = (role: string) => {
+    if (!selectedUser) return;
+    setUsers((u) => u.map((x) => x.name === selectedUser.name ? { ...x, role } : x));
+    toast.success(`${selectedUser.name} → роль «${role}»`);
+    setChangeRoleOpen(false);
+  };
+  const handleAddRole = () => {
+    if (!newRole.trim()) { toast.error('Введите название роли'); return; }
+    if (roles.includes(newRole.trim())) { toast.error('Такая роль уже есть'); return; }
+    setRoles((r) => [...r, newRole.trim()]);
+    toast.success(`Роль «${newRole.trim()}» создана`);
+    setNewRole(''); setAddRoleOpen(false);
+  };
+
   return (
     <section className="animate-float-up">
-      <div className="overflow-hidden rounded-3xl glass">
+      <div className="overflow-hidden rounded-3xl glass mb-8">
         <div className="h-40 bg-gradient-to-r from-primary/40 via-accent/30 to-primary/40" />
         <div className="px-6 pb-6">
           <Avatar className="-mt-12 h-24 w-24 border-4 border-background neon-glow">
-            <AvatarFallback className="bg-primary text-2xl font-bold text-primary-foreground">КА</AvatarFallback>
+            <AvatarFallback className="bg-primary text-2xl font-bold text-primary-foreground">{me.initials}</AvatarFallback>
           </Avatar>
           <div className="mt-4 flex flex-wrap items-center gap-3">
-            <h2 className="font-display text-3xl font-extrabold">Кай</h2>
-            <Badge className="rounded-full bg-accent/20 text-accent">Художник</Badge>
+            <h2 className="font-display text-3xl font-extrabold">{me.name}</h2>
+            <Badge className="rounded-full bg-accent/20 text-accent">{me.role}</Badge>
           </div>
-          <p className="mt-1 text-muted-foreground">@kai · Цифровое искусство и киберпанк</p>
-
+          <p className="mt-1 text-muted-foreground">{me.bio}</p>
           <div className="mt-6 grid grid-cols-3 gap-4">
-            {[
-              { label: 'Работы', value: '34' },
-              { label: 'Лайки', value: '2.1K' },
-              { label: 'Подписчики', value: '480' },
-            ].map((s) => (
+            {[{ label: 'Работы', value: String(me.works) }, { label: 'Лайки', value: '2.1K' }, { label: 'Подписчики', value: '480' }].map((s) => (
               <div key={s.label} className="rounded-2xl bg-secondary/50 p-4 text-center">
                 <p className="font-display text-2xl font-extrabold text-gradient">{s.value}</p>
                 <p className="text-xs text-muted-foreground">{s.label}</p>
               </div>
             ))}
           </div>
+        </div>
+      </div>
 
-          <div className="mt-6 rounded-2xl bg-secondary/40 p-4">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Загрузок сегодня</span>
-              <span className="font-semibold">3 / 10</span>
-            </div>
-            <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-background">
-              <div className="h-full w-[30%] rounded-full bg-gradient-to-r from-primary to-accent" />
-            </div>
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <h3 className="mb-4 font-display text-xl font-bold">Участники сообщества</h3>
+          <div className="space-y-2">
+            {users.map((u) => (
+              <div key={u.name} className="flex items-center gap-3 rounded-2xl glass p-3">
+                <button onClick={() => onUserClick(u)}>
+                  <Avatar className="cursor-pointer hover:ring-2 hover:ring-primary transition-all">
+                    <AvatarFallback className="bg-primary/30 text-foreground font-semibold">{u.initials}</AvatarFallback>
+                  </Avatar>
+                </button>
+                <button className="min-w-0 flex-1 text-left hover:text-accent transition-colors" onClick={() => onUserClick(u)}>
+                  <p className="font-semibold">{u.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">{u.bio}</p>
+                </button>
+                <Badge className="hidden sm:flex rounded-full bg-secondary text-muted-foreground text-xs shrink-0">{u.role}</Badge>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground shrink-0">
+                      <Icon name="EllipsisVertical" size={16} />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => onUserClick(u)}>
+                      <Icon name="User" size={16} className="mr-2" /> Открыть профиль
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => openChangeRole(u)}>
+                      <Icon name="Tag" size={16} className="mr-2" /> Изменить роль
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => toast.error(`${u.name} ограничен в загрузках`)}>
+                      <Icon name="Ban" size={16} className="mr-2" /> Ограничить загрузки
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <h3 className="mb-4 font-display text-xl font-bold">Роли</h3>
+          <div className="rounded-2xl glass p-4 space-y-2">
+            {roles.map((r) => (
+              <div key={r} className="flex items-center gap-2 rounded-xl bg-secondary/40 px-3 py-2">
+                <Icon name="Tag" size={14} className="text-accent shrink-0" />
+                <span className="text-sm font-medium flex-1">{r}</span>
+              </div>
+            ))}
+            <Button variant="outline" className="mt-2 w-full rounded-xl border-dashed" onClick={() => setAddRoleOpen(true)}>
+              <Icon name="Plus" size={16} className="mr-1" /> Добавить роль
+            </Button>
           </div>
         </div>
       </div>
+
+      <Dialog open={changeRoleOpen} onOpenChange={setChangeRoleOpen}>
+        <DialogContent className="glass border-border/50 sm:max-w-xs">
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl font-extrabold">
+              Роль для <span className="text-gradient">{selectedUser?.name}</span>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 pt-2">
+            {roles.map((r) => (
+              <button
+                key={r}
+                onClick={() => applyRole(r)}
+                className={`w-full rounded-xl px-4 py-2.5 text-left text-sm font-medium transition-all ${
+                  selectedUser?.role === r ? 'bg-primary text-primary-foreground' : 'bg-secondary/50 hover:bg-secondary'
+                }`}
+              >
+                {r}
+                {selectedUser?.role === r && <Icon name="Check" size={14} className="float-right mt-0.5" />}
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={addRoleOpen} onOpenChange={setAddRoleOpen}>
+        <DialogContent className="glass border-border/50 sm:max-w-xs">
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl font-extrabold">Новая роль</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <Input
+              value={newRole}
+              onChange={(e) => setNewRole(e.target.value)}
+              placeholder="Например: VIP-художник"
+              className="rounded-xl bg-secondary/50 border-border/50"
+              onKeyDown={(e) => e.key === 'Enter' && handleAddRole()}
+            />
+            <div className="flex gap-3">
+              <Button variant="secondary" className="flex-1 rounded-xl" onClick={() => setAddRoleOpen(false)}>Отмена</Button>
+              <Button className="flex-1 rounded-xl neon-glow" onClick={handleAddRole}>
+                <Icon name="Plus" size={16} className="mr-1" /> Создать
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }
@@ -360,12 +713,10 @@ function SettingsSection({ quotaCount, setQuotaCount, quotaSize, setQuotaSize }:
         <Icon name="Settings" size={28} className="text-accent" />
         <h2 className="font-display text-3xl font-extrabold">Настройки</h2>
       </div>
-
       <div className="space-y-6">
         <div className="rounded-2xl glass p-6">
           <h3 className="mb-1 font-display text-lg font-bold">Квоты на медиа</h3>
           <p className="mb-6 text-sm text-muted-foreground">Ограничения на загрузку для пользователей</p>
-
           <div className="space-y-7">
             <div>
               <div className="mb-3 flex items-center justify-between">
@@ -374,7 +725,6 @@ function SettingsSection({ quotaCount, setQuotaCount, quotaSize, setQuotaSize }:
               </div>
               <Slider value={quotaCount} onValueChange={setQuotaCount} max={50} min={1} step={1} />
             </div>
-
             <div>
               <div className="mb-3 flex items-center justify-between">
                 <label className="font-medium">Макс. размер файла</label>
@@ -384,7 +734,6 @@ function SettingsSection({ quotaCount, setQuotaCount, quotaSize, setQuotaSize }:
             </div>
           </div>
         </div>
-
         <div className="rounded-2xl glass p-6">
           <h3 className="mb-4 font-display text-lg font-bold">Параметры площадки</h3>
           <div className="space-y-4">
@@ -403,8 +752,7 @@ function SettingsSection({ quotaCount, setQuotaCount, quotaSize, setQuotaSize }:
             ))}
           </div>
         </div>
-
-        <Button className="w-full rounded-xl font-semibold neon-glow">
+        <Button className="w-full rounded-xl font-semibold neon-glow" onClick={() => toast.success('Настройки сохранены!')}>
           <Icon name="Save" size={16} className="mr-1" /> Сохранить настройки
         </Button>
       </div>
