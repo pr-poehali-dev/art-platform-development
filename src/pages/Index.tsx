@@ -5,6 +5,14 @@ import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { toast } from 'sonner';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 const ART_1 = 'https://cdn.poehali.dev/projects/0ee4ca3d-f475-41a9-8f16-dbceb309b837/files/b18cd49a-af07-4a44-aee0-93074b6859fe.jpg';
 const ART_2 = 'https://cdn.poehali.dev/projects/0ee4ca3d-f475-41a9-8f16-dbceb309b837/files/8f84b05c-0bb9-4e3f-ab42-ed436d611680.jpg';
@@ -160,6 +168,24 @@ function GallerySection() {
 }
 
 function ModerationSection() {
+  const [queue, setQueue] = useState(MOD_QUEUE);
+  const [mods, setMods] = useState(MODERATORS);
+
+  const approve = (item: (typeof MOD_QUEUE)[number]) => {
+    setQueue((q) => q.filter((x) => x.id !== item.id));
+    toast.success(`«${item.title}» одобрена и опубликована`);
+  };
+
+  const reject = (item: (typeof MOD_QUEUE)[number]) => {
+    setQueue((q) => q.filter((x) => x.id !== item.id));
+    toast.error(`«${item.title}» удалена из очереди`);
+  };
+
+  const removeMod = (name: string) => {
+    setMods((m) => m.filter((x) => x.name !== name));
+    toast(`${name} снят с модерации`);
+  };
+
   return (
     <section className="animate-float-up">
       <div className="mb-8 flex items-center gap-3">
@@ -172,10 +198,13 @@ function ModerationSection() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <h3 className="mb-4 font-display text-lg font-bold">Очередь на проверку</h3>
+          <h3 className="mb-4 font-display text-lg font-bold">
+            Очередь на проверку
+            <Badge className="ml-2 rounded-full bg-primary/30 text-foreground">{queue.length}</Badge>
+          </h3>
           <div className="space-y-3">
-            {MOD_QUEUE.map((item) => (
-              <div key={item.id} className="flex items-center gap-4 rounded-2xl glass p-3">
+            {queue.map((item) => (
+              <div key={item.id} className="flex items-center gap-4 rounded-2xl glass p-3 animate-float-up">
                 <img src={item.img} alt={item.title} className="h-16 w-16 rounded-xl object-cover" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-semibold">{item.title}</p>
@@ -183,22 +212,28 @@ function ModerationSection() {
                   <Badge className="mt-1 rounded-full bg-destructive/20 text-xs text-destructive">{item.reason}</Badge>
                 </div>
                 <div className="flex gap-2">
-                  <Button size="icon" variant="secondary" className="rounded-xl">
+                  <Button size="icon" variant="secondary" className="rounded-xl" onClick={() => approve(item)}>
                     <Icon name="Check" size={18} className="text-accent" />
                   </Button>
-                  <Button size="icon" variant="secondary" className="rounded-xl">
+                  <Button size="icon" variant="secondary" className="rounded-xl" onClick={() => reject(item)}>
                     <Icon name="Trash2" size={18} className="text-destructive" />
                   </Button>
                 </div>
               </div>
             ))}
+            {queue.length === 0 && (
+              <div className="rounded-2xl glass p-8 text-center text-muted-foreground">
+                <Icon name="PartyPopper" size={28} className="mx-auto mb-2 text-accent" />
+                Очередь пуста — все работы проверены!
+              </div>
+            )}
           </div>
         </div>
 
         <div>
           <h3 className="mb-4 font-display text-lg font-bold">Команда модераторов</h3>
           <div className="space-y-3 rounded-2xl glass p-4">
-            {MODERATORS.map((m) => (
+            {mods.map((m) => (
               <div key={m.name} className="flex items-center gap-3">
                 <Avatar>
                   <AvatarFallback className="bg-primary/30 text-foreground">{m.initials}</AvatarFallback>
@@ -207,10 +242,32 @@ function ModerationSection() {
                   <p className="font-semibold">{m.name}</p>
                   <p className="text-xs text-muted-foreground">{m.role}</p>
                 </div>
-                <Icon name="EllipsisVertical" size={18} className="text-muted-foreground" />
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
+                      <Icon name="EllipsisVertical" size={18} />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => toast(`Профиль ${m.name}`)}>
+                      <Icon name="User" size={16} className="mr-2" /> Профиль
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => toast.success(`${m.name} назначен главным`)}>
+                      <Icon name="Crown" size={16} className="mr-2" /> Сделать главным
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => removeMod(m.name)}>
+                      <Icon name="UserMinus" size={16} className="mr-2" /> Снять с модерации
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             ))}
-            <Button variant="outline" className="mt-2 w-full rounded-xl border-dashed">
+            <Button
+              variant="outline"
+              className="mt-2 w-full rounded-xl border-dashed"
+              onClick={() => toast('Форма назначения модератора скоро будет доступна')}
+            >
               <Icon name="UserPlus" size={16} className="mr-1" /> Назначить модератора
             </Button>
           </div>
