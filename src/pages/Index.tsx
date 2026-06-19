@@ -110,6 +110,13 @@ export default function Index() {
   const [viewUser, setViewUser] = useState<UserProfile | null>(null);
   const [quotaCount, setQCount] = useState([10]);
   const [quotaSize,  setQSize]  = useState([25]);
+  const [theme, setTheme]       = useState<'light' | 'dark'>('light');
+  const [myName, setMyName]     = useState(INIT_USERS[0].name);
+
+  // Применяем тёмную тему к body тоже
+  if (typeof document !== 'undefined') {
+    document.documentElement.style.colorScheme = theme;
+  }
 
   const openProfile = (name: string) => {
     const u = users.find(x => x.name === name);
@@ -117,10 +124,10 @@ export default function Index() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f9f9f9] text-foreground">
+    <div className={`min-h-screen text-foreground ${theme === 'dark' ? 'dark' : ''}`} style={{ background: theme === 'dark' ? '#111' : '#f9f9f9' }}>
 
       {/* Шапка */}
-      <header className="sticky top-0 z-50 border-b border-border bg-white">
+      <header className="sticky top-0 z-50 border-b border-border bg-card">
         <div className="container flex items-center justify-between py-3">
           <span className="font-display text-lg font-black tracking-tight">
             Wolf<span className="opacity-30">ART</span>
@@ -157,8 +164,8 @@ export default function Index() {
         {tab === 'gallery'    && <GallerySection gallery={gallery} setGallery={setGallery} onUpload={() => setUpload(true)} onUserClick={openProfile} />}
         {tab === 'moderation' && <ModerationSection onUserClick={openProfile} />}
         {tab === 'rules'      && <RulesSection />}
-        {tab === 'profile'    && <ProfileSection users={users} setUsers={setUsers} gallery={gallery} onUserClick={u => setViewUser(u)} />}
-        {tab === 'settings'   && <SettingsSection quotaCount={quotaCount} setQuotaCount={setQCount} quotaSize={quotaSize} setQuotaSize={setQSize} />}
+        {tab === 'profile'    && <ProfileSection users={users} setUsers={setUsers} gallery={gallery} myName={myName} onUserClick={u => setViewUser(u)} />}
+        {tab === 'settings'   && <SettingsSection quotaCount={quotaCount} setQuotaCount={setQCount} quotaSize={quotaSize} setQuotaSize={setQSize} theme={theme} setTheme={setTheme} myName={myName} setMyName={name => { setMyName(name); setUsers(u => u.map((x, i) => i === 0 ? { ...x, name } : x)); }} />}
       </main>
 
       <footer className="border-t border-border py-6 text-center text-xs text-muted-foreground">
@@ -344,7 +351,7 @@ function GallerySection({ gallery, setGallery, onUpload, onUserClick }: {
 
       <div className="columns-1 gap-4 sm:columns-2 lg:columns-3 [&>*]:mb-4">
         {gallery.map((art, i) => (
-          <article key={art.id} className="group relative overflow-hidden rounded-xl border border-border bg-white animate-float-up"
+          <article key={art.id} className="group relative overflow-hidden rounded-xl border border-border bg-card animate-float-up"
             style={{ animationDelay: `${i * 60}ms` }}>
             <img src={art.img} alt={art.title} className="w-full transition-transform duration-500 group-hover:scale-[1.03]" />
 
@@ -420,7 +427,7 @@ function ModerationSection({ onUserClick }: { onUserClick: (name: string) => voi
           </div>
           <div className="space-y-2">
             {queue.map(item => (
-              <div key={item.id} className="flex items-center gap-3 rounded-xl border border-border bg-white p-3">
+              <div key={item.id} className="flex items-center gap-3 rounded-xl border border-border bg-card p-3">
                 <img src={item.img} alt="" className="h-14 w-14 shrink-0 rounded-lg object-cover" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium">{item.title}</p>
@@ -449,7 +456,7 @@ function ModerationSection({ onUserClick }: { onUserClick: (name: string) => voi
         {/* Модераторы */}
         <div>
           <h3 className="font-semibold mb-4">Команда модераторов</h3>
-          <div className="divide-y divide-border rounded-xl border border-border bg-white">
+          <div className="divide-y divide-border rounded-xl border border-border bg-card">
             {mods.map(m => (
               <div key={m.name} className="flex items-center gap-3 p-3">
                 <Avatar className="h-8 w-8 shrink-0">
@@ -539,7 +546,7 @@ function RulesSection() {
       <p className="text-muted-foreground mb-8">Соблюдение правил делает сообщество лучше</p>
       <div className="grid gap-4 sm:grid-cols-2">
         {RULES_LIST.map((r, i) => (
-          <div key={r.title} className="rounded-xl border border-border bg-white p-5 animate-float-up"
+          <div key={r.title} className="rounded-xl border border-border bg-card p-5 animate-float-up"
             style={{ animationDelay: `${i * 60}ms` }}>
             <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
               <Icon name={r.icon} size={18} />
@@ -556,10 +563,11 @@ function RulesSection() {
 // ─────────────────────────────────────────────────
 // Профиль
 // ─────────────────────────────────────────────────
-function ProfileSection({ users, setUsers, gallery, onUserClick }: {
+function ProfileSection({ users, setUsers, gallery, myName, onUserClick }: {
   users: UserProfile[];
   setUsers: React.Dispatch<React.SetStateAction<UserProfile[]>>;
   gallery: GalleryItem[];
+  myName: string;
   onUserClick: (u: UserProfile) => void;
 }) {
   const [roles, setRoles]           = useState(INIT_ROLES);
@@ -571,7 +579,7 @@ function ProfileSection({ users, setUsers, gallery, onUserClick }: {
   const [banTarget, setBanTarget]   = useState<UserProfile | null>(null);
   const [banDays, setBanDays]       = useState('7');
 
-  const me = users[0];
+  const me = users.find(x => x.name === myName) ?? users[0];
 
   const openChangeRole = (u: UserProfile) => { setSelUser(u); setCROpen(true); };
   const applyRole = (role: string) => {
@@ -614,7 +622,7 @@ function ProfileSection({ users, setUsers, gallery, onUserClick }: {
   };
 
   const rowBg: Record<BanStatus, string> = {
-    active:     'border-border',
+    active:     'bg-card border-border',
     restricted: 'border-yellow-200 bg-yellow-50',
     temp:       'border-orange-200 bg-orange-50',
     banned:     'border-red-200 bg-red-50',
@@ -623,7 +631,7 @@ function ProfileSection({ users, setUsers, gallery, onUserClick }: {
   return (
     <section className="animate-float-up">
       {/* Моя карточка */}
-      <div className="mb-8 rounded-xl border border-border bg-white p-5">
+      <div className="mb-8 rounded-xl border border-border bg-card p-5">
         <div className="flex items-center gap-4">
           <Avatar className="h-16 w-16 border-2 border-border">
             <AvatarFallback className="bg-foreground text-background text-xl font-bold">{me.initials}</AvatarFallback>
@@ -650,7 +658,7 @@ function ProfileSection({ users, setUsers, gallery, onUserClick }: {
           <h3 className="font-semibold mb-3">Участники сообщества</h3>
           <div className="space-y-2">
             {users.map(u => (
-              <div key={u.name} className={`flex items-center gap-3 rounded-xl border bg-white p-3 ${rowBg[u.ban]}`}>
+              <div key={u.name} className={`flex items-center gap-3 rounded-xl border p-3 ${rowBg[u.ban]}`}>
                 <button onClick={() => onUserClick(u)}>
                   <Avatar className="h-9 w-9 cursor-pointer border border-border transition-all hover:ring-2 hover:ring-foreground/20">
                     <AvatarFallback className="bg-muted text-xs font-bold">{u.initials}</AvatarFallback>
@@ -723,7 +731,7 @@ function ProfileSection({ users, setUsers, gallery, onUserClick }: {
         {/* Роли */}
         <div>
           <h3 className="font-semibold mb-3">Роли</h3>
-          <div className="divide-y divide-border rounded-xl border border-border bg-white">
+          <div className="divide-y divide-border rounded-xl border border-border bg-card">
             {roles.map(r => (
               <div key={r} className="flex items-center gap-2 px-4 py-2.5">
                 <Icon name="Tag" size={13} className="shrink-0 text-muted-foreground" />
@@ -804,15 +812,82 @@ function ProfileSection({ users, setUsers, gallery, onUserClick }: {
 interface SettingsProps {
   quotaCount: number[]; setQuotaCount: (v: number[]) => void;
   quotaSize:  number[]; setQuotaSize:  (v: number[]) => void;
+  theme: 'light' | 'dark'; setTheme: (t: 'light' | 'dark') => void;
+  myName: string; setMyName: (n: string) => void;
 }
 
-function SettingsSection({ quotaCount, setQuotaCount, quotaSize, setQuotaSize }: SettingsProps) {
+const THEMES: { id: 'light' | 'dark'; label: string; icon: string; bg: string }[] = [
+  { id: 'light', label: 'Светлая',  icon: 'Sun',  bg: 'bg-white border-border' },
+  { id: 'dark',  label: 'Тёмная',   icon: 'Moon', bg: 'bg-zinc-900 border-zinc-700' },
+];
+
+function SettingsSection({ quotaCount, setQuotaCount, quotaSize, setQuotaSize, theme, setTheme, myName, setMyName }: SettingsProps) {
+  const [nameInput, setNameInput] = useState(myName);
+
+  const saveName = () => {
+    if (!nameInput.trim()) { toast.error('Имя не может быть пустым'); return; }
+    setMyName(nameInput.trim());
+    toast.success('Имя обновлено');
+  };
+
   return (
     <section className="mx-auto max-w-xl animate-float-up">
       <h2 className="font-display text-3xl font-black mb-1">Настройки</h2>
       <p className="text-muted-foreground mb-8">Управление площадкой</p>
       <div className="space-y-4">
-        <div className="rounded-xl border border-border bg-white p-5">
+
+        {/* Профиль */}
+        <div className="rounded-xl border border-border bg-card p-5">
+          <h3 className="font-semibold mb-1">Мой профиль</h3>
+          <p className="text-sm text-muted-foreground mb-4">Смените отображаемое имя</p>
+          <div className="flex gap-2">
+            <Input
+              value={nameInput}
+              onChange={e => setNameInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && saveName()}
+              placeholder="Ваше имя"
+              className="rounded-lg flex-1"
+            />
+            <Button className="rounded-lg shrink-0" onClick={saveName}>
+              <Icon name="Check" size={14} className="mr-1" />Сохранить
+            </Button>
+          </div>
+        </div>
+
+        {/* Тема */}
+        <div className="rounded-xl border border-border bg-card p-5">
+          <h3 className="font-semibold mb-1">Тема оформления</h3>
+          <p className="text-sm text-muted-foreground mb-4">Выберите внешний вид площадки</p>
+          <div className="grid grid-cols-2 gap-3">
+            {THEMES.map(t => (
+              <button key={t.id} onClick={() => setTheme(t.id)}
+                className={`relative flex flex-col items-start gap-2 rounded-xl border-2 p-4 text-left transition-all ${
+                  theme === t.id ? 'border-foreground' : 'border-border hover:border-foreground/30'
+                }`}>
+                {/* Превью темы */}
+                <div className={`w-full h-14 rounded-lg border ${t.bg} flex flex-col justify-between p-2`}>
+                  <div className={`h-2 w-2/3 rounded ${t.id === 'dark' ? 'bg-zinc-600' : 'bg-zinc-200'}`} />
+                  <div className="flex gap-1">
+                    <div className={`h-1.5 w-1/3 rounded ${t.id === 'dark' ? 'bg-zinc-700' : 'bg-zinc-100'}`} />
+                    <div className={`h-1.5 w-1/4 rounded ${t.id === 'dark' ? 'bg-zinc-700' : 'bg-zinc-100'}`} />
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Icon name={t.icon} size={14} />
+                  <span className="text-sm font-medium">{t.label}</span>
+                </div>
+                {theme === t.id && (
+                  <div className="absolute right-2 top-2 rounded-full bg-foreground p-0.5">
+                    <Icon name="Check" size={10} className="text-background" />
+                  </div>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Квоты */}
+        <div className="rounded-xl border border-border bg-card p-5">
           <h3 className="font-semibold mb-1">Квоты на медиа</h3>
           <p className="text-sm text-muted-foreground mb-6">Ограничения на загрузку для участников</p>
           <div className="space-y-6">
@@ -833,7 +908,8 @@ function SettingsSection({ quotaCount, setQuotaCount, quotaSize, setQuotaSize }:
           </div>
         </div>
 
-        <div className="rounded-xl border border-border bg-white p-5">
+        {/* Параметры */}
+        <div className="rounded-xl border border-border bg-card p-5">
           <h3 className="font-semibold mb-4">Параметры площадки</h3>
           <div className="space-y-4">
             {[
