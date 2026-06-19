@@ -36,15 +36,7 @@ const NAV = [
 
 const INIT_ROLES = ['Художник', 'Модератор', 'Пользователь'];
 
-interface GalleryItem {
-  id: number;
-  img: string;
-  title: string;
-  author: string;
-  likes: number;
-  tag: string;
-  preview?: string;
-}
+type BanStatus = 'active' | 'temp' | 'banned';
 
 interface UserProfile {
   name: string;
@@ -54,6 +46,18 @@ interface UserProfile {
   likes: number;
   bio: string;
   img?: string;
+  ban?: BanStatus;
+  banUntil?: string;
+}
+
+interface GalleryItem {
+  id: number;
+  img: string;
+  title: string;
+  author: string;
+  likes: number;
+  tag: string;
+  preview?: string;
 }
 
 const INIT_GALLERY: GalleryItem[] = [
@@ -77,13 +81,13 @@ const INIT_MODS = [
   { name: 'Vega', role: 'Модератор', initials: 'VG' },
 ];
 
-const USERS_DB: UserProfile[] = [
-  { name: 'Кай', initials: 'КА', role: 'Художник', works: 34, likes: 2100, bio: 'Цифровое искусство и киберпанк', img: ART_1 },
-  { name: 'Лина', initials: 'ЛН', role: 'Модератор', works: 12, likes: 870, bio: 'Иллюстратор, главред галереи', img: ART_2 },
-  { name: 'Артём', initials: 'АР', role: 'Художник', works: 21, likes: 1340, bio: 'Абстрактная живопись', img: ART_3 },
-  { name: 'Vega', initials: 'VG', role: 'Модератор', works: 8, likes: 560, bio: 'Фотограф и видеограф', img: ART_1 },
-  { name: 'Соня', initials: 'СН', role: 'Художник', works: 17, likes: 980, bio: 'Акварель + digital', img: ART_3 },
-  { name: 'Майя', initials: 'МА', role: 'Пользователь', works: 5, likes: 230, bio: 'Начинающий художник', img: ART_2 },
+const INIT_USERS: UserProfile[] = [
+  { name: 'Кай', initials: 'КА', role: 'Художник', works: 34, likes: 2100, bio: 'Цифровое искусство и киберпанк', img: ART_1, ban: 'active' },
+  { name: 'Лина', initials: 'ЛН', role: 'Модератор', works: 12, likes: 870, bio: 'Иллюстратор, главред галереи', img: ART_2, ban: 'active' },
+  { name: 'Артём', initials: 'АР', role: 'Художник', works: 21, likes: 1340, bio: 'Абстрактная живопись', img: ART_3, ban: 'active' },
+  { name: 'Vega', initials: 'VG', role: 'Модератор', works: 8, likes: 560, bio: 'Фотограф и видеограф', img: ART_1, ban: 'active' },
+  { name: 'Соня', initials: 'СН', role: 'Художник', works: 17, likes: 980, bio: 'Акварель + digital', img: ART_3, ban: 'active' },
+  { name: 'Майя', initials: 'МА', role: 'Пользователь', works: 5, likes: 230, bio: 'Начинающий художник', img: ART_2, ban: 'active' },
 ];
 
 const RULES = [
@@ -100,6 +104,12 @@ function Index() {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [gallery, setGallery] = useState(INIT_GALLERY);
   const [viewUser, setViewUser] = useState<UserProfile | null>(null);
+  const [users, setUsers] = useState(INIT_USERS);
+
+  const openProfile = (name: string) => {
+    const u = users.find((u) => u.name === name);
+    if (u) setViewUser(u);
+  };
 
   return (
     <div className="min-h-screen text-foreground">
@@ -110,7 +120,7 @@ function Index() {
               <Icon name="Palette" size={20} className="text-primary-foreground" />
             </div>
             <span className="font-display text-xl font-extrabold tracking-tight">
-              NEON<span className="text-gradient">ART</span>
+              Wolf<span className="text-gradient">ART</span>
             </span>
           </div>
           <nav className="hidden gap-1 md:flex">
@@ -150,16 +160,22 @@ function Index() {
         {tab === 'gallery' && (
           <GallerySection
             gallery={gallery}
+            setGallery={setGallery}
             onUpload={() => setUploadOpen(true)}
-            onUserClick={(name) => {
-              const u = USERS_DB.find((u) => u.name === name);
-              if (u) setViewUser(u);
-            }}
+            onUserClick={openProfile}
           />
         )}
-        {tab === 'moderation' && <ModerationSection />}
+        {tab === 'moderation' && (
+          <ModerationSection onUserClick={openProfile} />
+        )}
         {tab === 'rules' && <RulesSection />}
-        {tab === 'profile' && <ProfileSection onUserClick={(u) => setViewUser(u)} />}
+        {tab === 'profile' && (
+          <ProfileSection
+            users={users}
+            setUsers={setUsers}
+            onUserClick={(u) => setViewUser(u)}
+          />
+        )}
         {tab === 'settings' && (
           <SettingsSection
             quotaCount={quotaCount}
@@ -171,7 +187,7 @@ function Index() {
       </main>
 
       <footer className="border-t border-border/50 py-8 text-center text-sm text-muted-foreground">
-        NEONART — арт-площадка сообщества · 2026
+        WolfART — арт-площадка сообщества · 2026
       </footer>
 
       <UploadModal
@@ -202,8 +218,7 @@ function UploadModal({ open, onClose, onSubmit }: {
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
-    const url = URL.createObjectURL(f);
-    setPreview(url);
+    setPreview(URL.createObjectURL(f));
   };
 
   const handleSubmit = () => {
@@ -237,34 +252,20 @@ function UploadModal({ open, onClose, onSubmit }: {
             )}
             <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
           </div>
-
           <div className="space-y-1.5">
             <Label>Название работы</Label>
-            <Input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Например: Neon Dream"
-              className="rounded-xl bg-secondary/50 border-border/50"
-            />
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Например: Neon Dream" className="rounded-xl bg-secondary/50 border-border/50" />
           </div>
-
           <div className="space-y-1.5">
             <Label>Тег / категория</Label>
             <div className="flex gap-2 flex-wrap">
               {['Abstract', 'Portrait', 'Cyberpunk', 'Nature', 'Fantasy'].map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setTag(t)}
-                  className={`rounded-full px-3 py-1 text-xs font-medium transition-all ${
-                    tag === t ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
-                  }`}
-                >
+                <button key={t} onClick={() => setTag(t)} className={`rounded-full px-3 py-1 text-xs font-medium transition-all ${tag === t ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground hover:bg-secondary/80'}`}>
                   {t}
                 </button>
               ))}
             </div>
           </div>
-
           <div className="flex gap-3 pt-1">
             <Button variant="secondary" className="flex-1 rounded-xl" onClick={onClose}>Отмена</Button>
             <Button className="flex-1 rounded-xl neon-glow" onClick={handleSubmit}>
@@ -279,6 +280,9 @@ function UploadModal({ open, onClose, onSubmit }: {
 
 function UserProfileModal({ user, onClose }: { user: UserProfile | null; onClose: () => void }) {
   if (!user) return null;
+  const banLabel: Record<BanStatus, string> = { active: 'Активен', temp: 'Временный бан', banned: 'Забанен навсегда' };
+  const banColor: Record<BanStatus, string> = { active: 'bg-accent/20 text-accent', temp: 'bg-yellow-500/20 text-yellow-400', banned: 'bg-destructive/20 text-destructive' };
+  const status = user.ban ?? 'active';
   return (
     <Dialog open={!!user} onOpenChange={onClose}>
       <DialogContent className="glass border-border/50 sm:max-w-sm p-0 overflow-hidden">
@@ -290,15 +294,19 @@ function UserProfileModal({ user, onClose }: { user: UserProfile | null; onClose
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <h3 className="font-display text-2xl font-extrabold">{user.name}</h3>
             <Badge className="rounded-full bg-accent/20 text-accent text-xs">{user.role}</Badge>
+            <Badge className={`rounded-full text-xs ${banColor[status]}`}>{banLabel[status]}</Badge>
           </div>
-          <p className="mt-1 text-sm text-muted-foreground">{user.bio}</p>
+          {user.ban === 'temp' && user.banUntil && (
+            <p className="mt-1 text-xs text-yellow-400">Бан до: {user.banUntil}</p>
+          )}
+          <p className="mt-2 text-sm text-muted-foreground">{user.bio}</p>
           <div className="mt-5 grid grid-cols-2 gap-3">
             <div className="rounded-xl bg-secondary/50 p-3 text-center">
               <p className="font-display text-xl font-extrabold text-gradient">{user.works}</p>
               <p className="text-xs text-muted-foreground">Работ</p>
             </div>
             <div className="rounded-xl bg-secondary/50 p-3 text-center">
-              <p className="font-display text-xl font-extrabold text-gradient">{user.likes >= 1000 ? (user.likes/1000).toFixed(1)+'K' : user.likes}</p>
+              <p className="font-display text-xl font-extrabold text-gradient">{user.likes >= 1000 ? (user.likes / 1000).toFixed(1) + 'K' : user.likes}</p>
               <p className="text-xs text-muted-foreground">Лайков</p>
             </div>
           </div>
@@ -309,11 +317,17 @@ function UserProfileModal({ user, onClose }: { user: UserProfile | null; onClose
   );
 }
 
-function GallerySection({ gallery, onUpload, onUserClick }: {
+function GallerySection({ gallery, setGallery, onUpload, onUserClick }: {
   gallery: GalleryItem[];
+  setGallery: React.Dispatch<React.SetStateAction<GalleryItem[]>>;
   onUpload: () => void;
   onUserClick: (name: string) => void;
 }) {
+  const removeArt = (id: number) => {
+    setGallery((g) => g.filter((x) => x.id !== id));
+    toast.error('Работа удалена');
+  };
+
   return (
     <section>
       <div className="mb-8 max-w-2xl animate-float-up">
@@ -321,9 +335,7 @@ function GallerySection({ gallery, onUpload, onUserClick }: {
         <h1 className="font-display text-4xl font-extrabold leading-tight md:text-6xl">
           Покажи свой <span className="text-gradient">арт</span> миру
         </h1>
-        <p className="mt-4 text-muted-foreground">
-          Выкладывай работы, собирай лайки и вдохновляй других.
-        </p>
+        <p className="mt-4 text-muted-foreground">Выкладывай работы, собирай лайки и вдохновляй других.</p>
         <Button className="mt-5 rounded-xl neon-glow" onClick={onUpload}>
           <Icon name="Upload" size={16} className="mr-1" /> Загрузить работу
         </Button>
@@ -331,21 +343,22 @@ function GallerySection({ gallery, onUpload, onUserClick }: {
 
       <div className="columns-1 gap-5 sm:columns-2 lg:columns-3 [&>*]:mb-5">
         {gallery.map((art, i) => (
-          <article
-            key={art.id}
-            className="group relative overflow-hidden rounded-2xl glass animate-float-up"
-            style={{ animationDelay: `${i * 80}ms` }}
-          >
+          <article key={art.id} className="group relative overflow-hidden rounded-2xl glass animate-float-up" style={{ animationDelay: `${i * 80}ms` }}>
             <img src={art.img} alt={art.title} className="w-full transition-transform duration-500 group-hover:scale-105" />
             <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
+            {/* Кнопка удалить — всегда видна модератору */}
+            <button
+              onClick={() => removeArt(art.id)}
+              className="absolute right-3 top-3 rounded-xl bg-destructive/80 p-2 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-destructive"
+              title="Удалить работу"
+            >
+              <Icon name="Trash2" size={15} className="text-white" />
+            </button>
             <div className="absolute bottom-0 left-0 right-0 translate-y-2 p-4 opacity-0 transition-all group-hover:translate-y-0 group-hover:opacity-100">
               <Badge className="mb-2 rounded-full bg-primary/30 text-xs text-foreground">{art.tag}</Badge>
               <h3 className="font-display text-lg font-bold">{art.title}</h3>
               <div className="mt-1 flex items-center justify-between text-sm text-muted-foreground">
-                <button
-                  className="hover:text-accent transition-colors"
-                  onClick={() => onUserClick(art.author)}
-                >
+                <button className="hover:text-accent transition-colors" onClick={() => onUserClick(art.author)}>
                   @{art.author}
                 </button>
                 <span className="flex items-center gap-1">
@@ -360,7 +373,7 @@ function GallerySection({ gallery, onUpload, onUserClick }: {
   );
 }
 
-function ModerationSection() {
+function ModerationSection({ onUserClick }: { onUserClick: (name: string) => void }) {
   const [queue, setQueue] = useState(MOD_QUEUE_INIT);
   const [mods, setMods] = useState(INIT_MODS);
   const [addModOpen, setAddModOpen] = useState(false);
@@ -443,19 +456,19 @@ function ModerationSection() {
                 <Avatar>
                   <AvatarFallback className="bg-primary/30 text-foreground">{m.initials}</AvatarFallback>
                 </Avatar>
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   <p className="font-semibold">{m.name}</p>
-                  <p className="text-xs text-muted-foreground">{m.role}</p>
+                  <p className="text-xs text-muted-foreground truncate">{m.role}</p>
                 </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
+                    <button className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground shrink-0">
                       <Icon name="EllipsisVertical" size={18} />
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => toast(`Профиль ${m.name}`)}>
-                      <Icon name="User" size={16} className="mr-2" /> Профиль
+                    <DropdownMenuItem onClick={() => onUserClick(m.name)}>
+                      <Icon name="User" size={16} className="mr-2" /> Открыть профиль
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => promoteToChief(m.name)}>
                       <Icon name="Crown" size={16} className="mr-2" /> Сделать главным
@@ -483,24 +496,13 @@ function ModerationSection() {
           <div className="space-y-4 pt-2">
             <div className="space-y-1.5">
               <Label>Имя пользователя</Label>
-              <Input
-                value={newModName}
-                onChange={(e) => setNewModName(e.target.value)}
-                placeholder="Например: Алекс"
-                className="rounded-xl bg-secondary/50 border-border/50"
-              />
+              <Input value={newModName} onChange={(e) => setNewModName(e.target.value)} placeholder="Например: Алекс" className="rounded-xl bg-secondary/50 border-border/50" />
             </div>
             <div className="space-y-1.5">
               <Label>Роль</Label>
               <div className="flex flex-wrap gap-2">
                 {['Модератор', 'Главный модератор'].map((r) => (
-                  <button
-                    key={r}
-                    onClick={() => setNewModRole(r)}
-                    className={`rounded-full px-3 py-1 text-xs font-medium transition-all ${
-                      newModRole === r ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground'
-                    }`}
-                  >
+                  <button key={r} onClick={() => setNewModRole(r)} className={`rounded-full px-3 py-1 text-xs font-medium transition-all ${newModRole === r ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground'}`}>
                     {r}
                   </button>
                 ))}
@@ -541,20 +543,23 @@ function RulesSection() {
   );
 }
 
-function ProfileSection({ onUserClick }: { onUserClick: (u: UserProfile) => void }) {
-  const [users, setUsers] = useState(USERS_DB);
+function ProfileSection({ users, setUsers, onUserClick }: {
+  users: UserProfile[];
+  setUsers: React.Dispatch<React.SetStateAction<UserProfile[]>>;
+  onUserClick: (u: UserProfile) => void;
+}) {
   const [roles, setRoles] = useState(INIT_ROLES);
   const [newRole, setNewRole] = useState('');
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
   const [changeRoleOpen, setChangeRoleOpen] = useState(false);
   const [addRoleOpen, setAddRoleOpen] = useState(false);
+  const [banOpen, setBanOpen] = useState(false);
+  const [banTarget, setBanTarget] = useState<UserProfile | null>(null);
+  const [banDays, setBanDays] = useState('7');
 
   const me = users[0];
 
-  const openChangeRole = (u: UserProfile) => {
-    setSelectedUser(u);
-    setChangeRoleOpen(true);
-  };
+  const openChangeRole = (u: UserProfile) => { setSelectedUser(u); setChangeRoleOpen(true); };
   const applyRole = (role: string) => {
     if (!selectedUser) return;
     setUsers((u) => u.map((x) => x.name === selectedUser.name ? { ...x, role } : x));
@@ -567,6 +572,31 @@ function ProfileSection({ onUserClick }: { onUserClick: (u: UserProfile) => void
     setRoles((r) => [...r, newRole.trim()]);
     toast.success(`Роль «${newRole.trim()}» создана`);
     setNewRole(''); setAddRoleOpen(false);
+  };
+
+  const openBan = (u: UserProfile) => { setBanTarget(u); setBanOpen(true); };
+  const applyBan = (type: 'temp' | 'banned') => {
+    if (!banTarget) return;
+    const until = type === 'temp'
+      ? new Date(Date.now() + Number(banDays) * 86400000).toLocaleDateString('ru-RU')
+      : undefined;
+    setUsers((u) => u.map((x) => x.name === banTarget.name ? { ...x, ban: type, banUntil: until } : x));
+    toast.error(type === 'banned' ? `${banTarget.name} забанен навсегда` : `${banTarget.name} забанен на ${banDays} дней`);
+    setBanOpen(false);
+  };
+  const unban = (name: string) => {
+    setUsers((u) => u.map((x) => x.name === name ? { ...x, ban: 'active', banUntil: undefined } : x));
+    toast.success(`${name} разбанен`);
+  };
+  const removeRestrict = (name: string) => {
+    setUsers((u) => u.map((x) => x.name === name ? { ...x, ban: 'active', banUntil: undefined } : x));
+    toast(`Ограничения с ${name} сняты`);
+  };
+
+  const banColor: Record<BanStatus, string> = {
+    active: '',
+    temp: 'bg-yellow-500/10 border-yellow-500/20',
+    banned: 'bg-destructive/10 border-destructive/20',
   };
 
   return (
@@ -598,7 +628,7 @@ function ProfileSection({ onUserClick }: { onUserClick: (u: UserProfile) => void
           <h3 className="mb-4 font-display text-xl font-bold">Участники сообщества</h3>
           <div className="space-y-2">
             {users.map((u) => (
-              <div key={u.name} className="flex items-center gap-3 rounded-2xl glass p-3">
+              <div key={u.name} className={`flex items-center gap-3 rounded-2xl glass p-3 border ${banColor[u.ban ?? 'active']}`}>
                 <button onClick={() => onUserClick(u)}>
                   <Avatar className="cursor-pointer hover:ring-2 hover:ring-primary transition-all">
                     <AvatarFallback className="bg-primary/30 text-foreground font-semibold">{u.initials}</AvatarFallback>
@@ -608,7 +638,11 @@ function ProfileSection({ onUserClick }: { onUserClick: (u: UserProfile) => void
                   <p className="font-semibold">{u.name}</p>
                   <p className="text-xs text-muted-foreground truncate">{u.bio}</p>
                 </button>
-                <Badge className="hidden sm:flex rounded-full bg-secondary text-muted-foreground text-xs shrink-0">{u.role}</Badge>
+                <div className="hidden sm:flex flex-col items-end gap-1 shrink-0">
+                  <Badge className="rounded-full bg-secondary text-muted-foreground text-xs">{u.role}</Badge>
+                  {u.ban === 'temp' && <Badge className="rounded-full bg-yellow-500/20 text-yellow-400 text-xs">Бан до {u.banUntil}</Badge>}
+                  {u.ban === 'banned' && <Badge className="rounded-full bg-destructive/20 text-destructive text-xs">Забанен</Badge>}
+                </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground shrink-0">
@@ -623,9 +657,25 @@ function ProfileSection({ onUserClick }: { onUserClick: (u: UserProfile) => void
                       <Icon name="Tag" size={16} className="mr-2" /> Изменить роль
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => toast.error(`${u.name} ограничен в загрузках`)}>
-                      <Icon name="Ban" size={16} className="mr-2" /> Ограничить загрузки
-                    </DropdownMenuItem>
+                    {u.ban !== 'active' ? (
+                      <>
+                        <DropdownMenuItem onClick={() => unban(u.name)}>
+                          <Icon name="ShieldCheck" size={16} className="mr-2 text-accent" /> Разбанить
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => removeRestrict(u.name)}>
+                          <Icon name="ShieldOff" size={16} className="mr-2 text-muted-foreground" /> Снять ограничения
+                        </DropdownMenuItem>
+                      </>
+                    ) : (
+                      <>
+                        <DropdownMenuItem onClick={() => openBan(u)}>
+                          <Icon name="Clock" size={16} className="mr-2 text-yellow-400" /> Временный бан
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => applyBan.bind(null)('banned') || setBanTarget(u) || applyBan('banned')}>
+                          <Icon name="Ban" size={16} className="mr-2" /> Бан навсегда
+                        </DropdownMenuItem>
+                      </>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -649,6 +699,7 @@ function ProfileSection({ onUserClick }: { onUserClick: (u: UserProfile) => void
         </div>
       </div>
 
+      {/* Диалог смена роли */}
       <Dialog open={changeRoleOpen} onOpenChange={setChangeRoleOpen}>
         <DialogContent className="glass border-border/50 sm:max-w-xs">
           <DialogHeader>
@@ -658,13 +709,7 @@ function ProfileSection({ onUserClick }: { onUserClick: (u: UserProfile) => void
           </DialogHeader>
           <div className="space-y-2 pt-2">
             {roles.map((r) => (
-              <button
-                key={r}
-                onClick={() => applyRole(r)}
-                className={`w-full rounded-xl px-4 py-2.5 text-left text-sm font-medium transition-all ${
-                  selectedUser?.role === r ? 'bg-primary text-primary-foreground' : 'bg-secondary/50 hover:bg-secondary'
-                }`}
-              >
+              <button key={r} onClick={() => applyRole(r)} className={`w-full rounded-xl px-4 py-2.5 text-left text-sm font-medium transition-all ${selectedUser?.role === r ? 'bg-primary text-primary-foreground' : 'bg-secondary/50 hover:bg-secondary'}`}>
                 {r}
                 {selectedUser?.role === r && <Icon name="Check" size={14} className="float-right mt-0.5" />}
               </button>
@@ -673,23 +718,41 @@ function ProfileSection({ onUserClick }: { onUserClick: (u: UserProfile) => void
         </DialogContent>
       </Dialog>
 
+      {/* Диалог добавить роль */}
       <Dialog open={addRoleOpen} onOpenChange={setAddRoleOpen}>
         <DialogContent className="glass border-border/50 sm:max-w-xs">
           <DialogHeader>
             <DialogTitle className="font-display text-xl font-extrabold">Новая роль</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
-            <Input
-              value={newRole}
-              onChange={(e) => setNewRole(e.target.value)}
-              placeholder="Например: VIP-художник"
-              className="rounded-xl bg-secondary/50 border-border/50"
-              onKeyDown={(e) => e.key === 'Enter' && handleAddRole()}
-            />
+            <Input value={newRole} onChange={(e) => setNewRole(e.target.value)} placeholder="Например: VIP-художник" className="rounded-xl bg-secondary/50 border-border/50" onKeyDown={(e) => e.key === 'Enter' && handleAddRole()} />
             <div className="flex gap-3">
               <Button variant="secondary" className="flex-1 rounded-xl" onClick={() => setAddRoleOpen(false)}>Отмена</Button>
               <Button className="flex-1 rounded-xl neon-glow" onClick={handleAddRole}>
                 <Icon name="Plus" size={16} className="mr-1" /> Создать
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Диалог временный бан */}
+      <Dialog open={banOpen} onOpenChange={setBanOpen}>
+        <DialogContent className="glass border-border/50 sm:max-w-xs">
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl font-extrabold">
+              Временный бан — <span className="text-gradient">{banTarget?.name}</span>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-1.5">
+              <Label>Количество дней</Label>
+              <Input value={banDays} onChange={(e) => setBanDays(e.target.value)} type="number" min="1" className="rounded-xl bg-secondary/50 border-border/50" />
+            </div>
+            <div className="flex gap-3">
+              <Button variant="secondary" className="flex-1 rounded-xl" onClick={() => setBanOpen(false)}>Отмена</Button>
+              <Button className="flex-1 rounded-xl bg-yellow-600 hover:bg-yellow-500 text-white" onClick={() => applyBan('temp')}>
+                <Icon name="Clock" size={16} className="mr-1" /> Забанить
               </Button>
             </div>
           </div>
